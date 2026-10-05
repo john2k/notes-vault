@@ -1,0 +1,57 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: #f7f5f1;
+  --foreground: #18181b;
+  --panel: #ffffff;
+  --accent: #0f766e;
+}
+
+body {
+  color: var(--foreground);
+  background: var(--background);
+  font-family: var(--font-sans), "IBM Plex Sans", sans-serif;
+}
+
+.ProseMirror {
+  min-height: 50vh;
+}
+
+.ProseMirror pre {
+  position: relative;
+  background: #18181b;
+  color: #f4f4f5;
+  border-radius: 0.5rem;
+  padding: 0.85rem 1rem;
+  overflow-x: auto;
+}
+
+.ProseMirror code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.875em;
+}
+
+.ProseMirror h1,
+.ProseMirror h2,
+.ProseMirror h3 {
+  font-family: var(--font-display), "Source Serif 4", serif;
+  font-weight: 600;
+  margin-top: 1.2em;
+  margin-bottom: 0.4em;
+}
+
+.ProseMirror p {
+  margin: 0.55em 0;
+}
+
+.ProseMirror ul {
+  list-style: disc;
+  padding-left: 1.25rem;
+}
+
+mark {
+  background: #fde68a;
+  padding: 0 0.1em;
+}

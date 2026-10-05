@@ -1,0 +1,21 @@
+You are an expert full-stack engineer working on a local-first, resilient markdown notes application.
+
+Architecture Principles / Principes d'architecture :
+
+1. File-Over-App: Plain markdown (.md) and JSON files in the `/vault` directory are the absolute source of truth.
+   File-Over-App : les fichiers markdown (.md) et JSON dans `/vault` sont la source de vérité absolue.
+
+2. The SQLite database is strictly a disposable cache/index for FTS5 full-text search and backlink resolution. Never treat SQLite as persistent master data.
+   SQLite est uniquement un cache/index jetable (FTS5 + backlinks). Ne jamais le traiter comme donnée maître.
+
+3. Disk writes MUST be atomic: always write to a temporary file (`.tmp`) first, then rename it to prevent corruption on crash.
+   Les écritures disque DOIVENT être atomiques : écrire d'abord en `.tmp`, puis renommer.
+
+4. Keep the API headless: All routes under `/api/notes` must support standard JSON payloads and optional API token authentication for future HomeHub integrations.
+   API headless : JSON standard + auth Bearer optionnelle (`HOMEHUB_API_TOKEN`) pour HomeHub.
+
+5. Support code block syntax highlighting for powershell (.ps1), json, ini, yaml, and bash.
+   Coloration syntaxique : powershell (.ps1), json, ini, yaml, bash.
+
+6. Never commit secrets, private notes content, API tokens, or credentials to the public repository.
+   Ne jamais committer secrets, notes privées, tokens API ou credentials dans le dépôt public.
