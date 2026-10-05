@@ -3,6 +3,10 @@
 import { ChevronDown, ChevronRight, FilePlus2, Folder, Search } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { cn, getNoteColor } from "@/lib/utils";
+import {
+  NoteContextMenu,
+  type NoteContextAction,
+} from "@/components/sidebar/NoteContextMenu";
 
 export interface SidebarNote {
   path: string;
@@ -18,6 +22,7 @@ interface SidebarProps {
   onSelect: (path: string) => void;
   onCreate: (folder: string) => void;
   onSearch: (query: string) => void;
+  onNoteAction?: (action: NoteContextAction, path: string) => void;
 }
 
 const COLLAPSE_KEY = "notes-vault-collapsed-folders";
@@ -33,19 +38,22 @@ function loadCollapsed(): Set<string> {
   }
 }
 
-/**
- * Sidebar tree with collapsible folders.
- * Arborescence sidebar avec dossiers repliables.
- */
 export function Sidebar({
   notes,
   activePath,
   onSelect,
   onCreate,
   onSearch,
+  onNoteAction,
 }: SidebarProps) {
   const [query, setQuery] = useState("");
   const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set());
+  const [menu, setMenu] = useState<{
+    x: number;
+    y: number;
+    path: string;
+    title: string;
+  } | null>(null);
 
   useEffect(() => {
     setCollapsed(loadCollapsed());
@@ -55,7 +63,7 @@ export function Sidebar({
     try {
       localStorage.setItem(COLLAPSE_KEY, JSON.stringify([...collapsed]));
     } catch {
-      // ignore quota / private mode
+      // ignore
     }
   }, [collapsed]);
 
@@ -69,7 +77,6 @@ export function Sidebar({
     return [...map.entries()].sort(([a], [b]) => a.localeCompare(b));
   }, [notes]);
 
-  // Keep the active note's folder expanded
   useEffect(() => {
     if (!activePath) return;
     const folder = activePath.includes("/")
@@ -157,6 +164,15 @@ export function Sidebar({
                         <button
                           type="button"
                           onClick={() => onSelect(note.path)}
+                          onContextMenu={(e) => {
+                            e.preventDefault();
+                            setMenu({
+                              x: e.clientX,
+                              y: e.clientY,
+                              path: note.path,
+                              title: note.title,
+                            });
+                          }}
                           className={cn(
                             "flex w-full items-center gap-2 rounded-md border-l-[3px] px-2 py-1.5 text-left text-sm transition",
                             active
@@ -192,6 +208,16 @@ export function Sidebar({
           );
         })}
       </div>
+
+      <NoteContextMenu
+        open={Boolean(menu)}
+        x={menu?.x || 0}
+        y={menu?.y || 0}
+        path={menu?.path || ""}
+        title={menu?.title || ""}
+        onClose={() => setMenu(null)}
+        onAction={(action, path) => onNoteAction?.(action, path)}
+      />
     </aside>
   );
 }

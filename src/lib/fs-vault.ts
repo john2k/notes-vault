@@ -146,6 +146,100 @@ export async function trashNote(relativePath: string): Promise<string> {
 }
 
 /**
+ * Move/rename a note file inside the vault (atomic rename).
+ * Déplace/renomme une note dans le vault (rename atomique).
+ */
+export async function moveNote(
+  fromPath: string,
+  toPath: string,
+  options?: { title?: string }
+): Promise<string> {
+  await ensureVaultStructure();
+  const from = fromPath.replace(/\\/g, "/");
+  let to = toPath.replace(/\\/g, "/");
+  if (!to.endsWith(".md")) to = `${to}.md`;
+
+  const fromFull = path.join(VAULT_DIR, from);
+  const toFull = path.join(VAULT_DIR, to);
+  assertInsideVault(fromFull);
+  assertInsideVault(toFull);
+
+  if (from === to && !options?.title) return to;
+
+  // Ensure destination doesn't overwrite another note
+  try {
+    await fs.access(toFull);
+    if (from !== to) {
+      throw new Error("Destination already exists / Destination déjà existante");
+    }
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code !== "ENOENT" && from !== to) {
+      throw err;
+    }
+  }
+
+  if (options?.title || from !== to) {
+    const note = await readNote(from);
+    const meta = {
+      ...note.metadata,
+      title: options?.title ?? note.metadata.title,
+    };
+    // Write to destination first (atomic), then remove source if different
+    await saveNoteAtomic(to, note.content, meta);
+    if (from !== to) {
+      await fs.unlink(fromFull);
+    }
+  } else {
+    await fs.mkdir(path.dirname(toFull), { recursive: true });
+    await fs.rename(fromFull, toFull);
+  }
+
+  return to;
+}
+
+/**
+ * Duplicate a note to a new path.
+ * Duplique une note vers un nouveau chemin.
+ */
+export async function copyNote(
+  fromPath: string,
+  toPath?: string
+): Promise<string> {
+  await ensureVaultStructure();
+  const from = fromPath.replace(/\\/g, "/");
+  const note = await readNote(from);
+  const dir = path.posix.dirname(from);
+  const base = path.basename(from, ".md");
+  const dest =
+    toPath?.replace(/\\/g, "/") ||
+    `${dir === "." ? "" : `${dir}/`}${base}-copy-${Date.now()}.md`;
+
+  await saveNoteAtomic(dest, note.content, {
+    ...note.metadata,
+    id: randomUUID(),
+    title: `${note.metadata.title} (copie)`,
+  });
+  return dest;
+}
+
+/** List top-level vault folders for move dialog */
+export async function listVaultFolders(): Promise<string[]> {
+  await ensureVaultStructure();
+  const entries = await fs.readdir(VAULT_DIR, { withFileTypes: true });
+  return entries
+    .filter(
+      (e) =>
+        e.isDirectory() &&
+        !e.name.startsWith(".") &&
+        e.name !== "_attachments" &&
+        e.name !== "_trash"
+    )
+    .map((e) => e.name)
+    .sort();
+}
+
+
+/**
  * Recursively list markdown (and canvas) files under vault.
  * Liste récursive des fichiers markdown (et canvas) du coffre.
  */

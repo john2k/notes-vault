@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { Sidebar, type SidebarNote } from "@/components/sidebar/Sidebar";
+import type { NoteContextAction } from "@/components/sidebar/NoteContextMenu";
 import { Editor } from "@/components/editor/Editor";
 import { AudioRecorder } from "@/components/media/AudioRecorder";
 import { CommandPalette } from "@/components/command/CommandPalette";
@@ -203,6 +204,101 @@ export function WorkspaceApp() {
     setNotes(list);
   };
 
+  const handleNoteAction = async (action: NoteContextAction, path: string) => {
+    try {
+      if (action === "rename") {
+        const current = notes.find((n) => n.path === path);
+        const title = window.prompt("Nouveau titre / New title", current?.title || "");
+        if (!title?.trim()) return;
+        const res = await fetch("/api/notes/actions", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "rename", path, title: title.trim() }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Rename failed");
+        await refreshList();
+        if (data.path) await openNote(data.path);
+        return;
+      }
+
+      if (action === "move") {
+        const foldersRes = await fetch("/api/notes/actions?list=folders");
+        const foldersData = await foldersRes.json();
+        const folders = (foldersData.folders || []) as string[];
+        const choice = window.prompt(
+          `Dossier cible / Target folder:\n${folders.join(", ")}`,
+          path.includes("/") ? path.split("/").slice(0, -1).join("/") : "_inbox"
+        );
+        if (!choice?.trim()) return;
+        const res = await fetch("/api/notes/actions", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "move",
+            path,
+            folder: choice.trim(),
+          }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Move failed");
+        await refreshList();
+        if (data.path) await openNote(data.path);
+        return;
+      }
+
+      if (action === "copy") {
+        const res = await fetch("/api/notes/actions", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "copy", path }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Copy failed");
+        await refreshList();
+        if (data.path) await openNote(data.path);
+        return;
+      }
+
+      if (action === "export") {
+        const res = await fetch("/api/notes/actions", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "export", path }),
+        });
+        if (!res.ok) {
+          const data = await res.json();
+          throw new Error(data.error || "Export failed");
+        }
+        const blob = await res.blob();
+        const filename = path.split("/").pop() || "note.md";
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = filename;
+        a.click();
+        URL.revokeObjectURL(url);
+        return;
+      }
+
+      if (action === "trash") {
+        if (!window.confirm(`Envoyer « ${path} » à la corbeille ?`)) return;
+        const res = await fetch(
+          `/api/notes/${path.split("/").map(encodeURIComponent).join("/")}`,
+          { method: "DELETE" }
+        );
+        if (!res.ok) throw new Error("Trash failed");
+        await refreshList();
+        if (activePath === path) {
+          setNote(null);
+          setActivePath(null);
+        }
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Action failed");
+    }
+  };
+
   return (
     <div className="flex h-screen bg-[var(--background)]">
       <div className="flex h-full w-72 flex-col border-r border-[var(--border)] bg-[var(--panel)]">
@@ -212,6 +308,7 @@ export function WorkspaceApp() {
           onSelect={(p) => void openNote(p)}
           onCreate={() => setTemplatesOpen(true)}
           onSearch={(q) => void refreshList(q || undefined)}
+          onNoteAction={(action, path) => void handleNoteAction(action, path)}
         />
         <SmartFolders onApply={(f) => void applySmartFilter(f)} />
       </div>
