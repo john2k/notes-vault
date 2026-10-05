@@ -1,0 +1,14 @@
+{
+  "folders": [
+    {
+      "id": "sf-inbox",
+      "name": "Inbox only",
+      "folder": "_inbox"
+    },
+    {
+      "id": "sf-setup",
+      "name": "Tag setup",
+      "tag": "setup"
+    }
+  ]
+}

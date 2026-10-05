@@ -29,7 +29,15 @@ export async function GET(_request: NextRequest, ctx: Ctx) {
         ? "application/pdf"
         : ext === ".webm"
           ? "audio/webm"
-          : "application/octet-stream";
+          : ext === ".png"
+            ? "image/png"
+            : ext === ".jpg" || ext === ".jpeg"
+              ? "image/jpeg"
+              : ext === ".gif"
+                ? "image/gif"
+                : ext === ".webp"
+                  ? "image/webp"
+                  : "application/octet-stream";
     return new Response(data, {
       headers: {
         "Content-Type": type,

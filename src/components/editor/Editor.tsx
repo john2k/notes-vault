@@ -27,6 +27,7 @@ import {
 import type { NoteMetadata } from "@/lib/fs-vault";
 import { NOTE_COLORS, cn, getNoteColor } from "@/lib/utils";
 import { CODE_LANGUAGES } from "@/components/editor/CodeBlock";
+import { MermaidBlock } from "@/components/editor/MermaidBlock";
 
 const lowlight = createLowlight(common);
 
@@ -49,6 +50,10 @@ interface EditorProps {
   initialContent: string;
   initialMetadata: NoteMetadata;
   onSaved?: (metadata: NoteMetadata) => void;
+  onContentChange?: (content: string) => void;
+  externalInsert?: string | null;
+  onExternalInsertConsumed?: () => void;
+  onWikiLink?: (target: string) => void;
 }
 
 function escapeHtml(s: string): string {
@@ -153,7 +158,16 @@ function markdownToHtml(md: string): string {
       const withInline = escapeHtml(line)
         .replace(/`([^`]+)`/g, "<code>$1</code>")
         .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
-        .replace(/\*([^*]+)\*/g, "<em>$1</em>");
+        .replace(/\*([^*]+)\*/g, "<em>$1</em>")
+        .replace(
+          /\[\[([^\]|#]+)(?:\|([^\]]+))?\]\]/g,
+          (_m, target: string, alias?: string) =>
+            `<a href="#" data-wikilink="${escapeHtml(target)}" class="wikilink">${escapeHtml(alias || target)}</a>`
+        );
+      // Callouts: > [!info] title
+      if (/^&gt; \[!(info|warning|tip|note)\]/i.test(escapeHtml(line))) {
+        // handled below via raw line
+      }
       html.push(`<p>${withInline}</p>`);
     }
   }
@@ -354,6 +368,10 @@ export function Editor({
   initialContent,
   initialMetadata,
   onSaved,
+  onContentChange,
+  externalInsert,
+  onExternalInsertConsumed,
+  onWikiLink,
 }: EditorProps) {
   const [mode, setMode] = useState<EditorMode>("document");
   const [raw, setRaw] = useState(initialContent);
@@ -361,6 +379,8 @@ export function Editor({
   const [copied, setCopied] = useState(false);
   const [saving, setSaving] = useState(false);
   const [codeLang, setCodeLang] = useState("powershell");
+  const [slashOpen, setSlashOpen] = useState(false);
+  const [aiBusy, setAiBusy] = useState(false);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const latestRef = useRef({ content: initialContent, metadata: initialMetadata });
   const palette = getNoteColor(metadata.color);
@@ -406,6 +426,7 @@ export function Editor({
 
   const scheduleSave = (content: string, meta: NoteMetadata) => {
     latestRef.current = { content, metadata: meta };
+    onContentChange?.(content);
     if (saveTimer.current) clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(() => {
       void persist(content, meta);
@@ -420,6 +441,52 @@ export function Editor({
       attributes: {
         class: "ProseMirror max-w-none px-5 py-4",
       },
+      handlePaste: (_view, event) => {
+        const items = event.clipboardData?.items;
+        if (!items) return false;
+        for (const item of items) {
+          if (item.type.startsWith("image/")) {
+            event.preventDefault();
+            const file = item.getAsFile();
+            if (!file) return true;
+            void (async () => {
+              const form = new FormData();
+              form.append("file", file, file.name || "paste.png");
+              form.append("kind", "image");
+              const res = await fetch("/api/upload-media", {
+                method: "POST",
+                body: form,
+              });
+              const data = await res.json();
+              if (!data.path) return;
+              const url = `/api/attachments/${String(data.path)
+                .replace(/^_attachments\//, "")
+                .split("/")
+                .map(encodeURIComponent)
+                .join("/")}`;
+              const md = `\n\n![image](${url})\n\n`;
+              const next = latestRef.current.content + md;
+              setRaw(next);
+              scheduleSave(next, latestRef.current.metadata);
+              editor
+                ?.chain()
+                .focus()
+                .insertContent(`<p><img src="${url}" alt="image" /></p>`)
+                .run();
+            })();
+            return true;
+          }
+        }
+        return false;
+      },
+      handleKeyDown: (_view, event) => {
+        if (event.key === "/") {
+          setSlashOpen(true);
+        } else if (event.key === "Escape") {
+          setSlashOpen(false);
+        }
+        return false;
+      },
     },
     onUpdate: ({ editor: ed }) => {
       const md = htmlToMarkdown(ed.getHTML());
@@ -427,6 +494,95 @@ export function Editor({
       scheduleSave(md, latestRef.current.metadata);
     },
   });
+
+  useEffect(() => {
+    if (!externalInsert) return;
+    const next = `${latestRef.current.content.trimEnd()}\n\n${externalInsert.trim()}\n`;
+    setRaw(next);
+    scheduleSave(next, latestRef.current.metadata);
+    editor?.commands.setContent(markdownToHtml(next), { emitUpdate: false });
+    onExternalInsertConsumed?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [externalInsert]);
+
+  useEffect(() => {
+    const root = document.querySelector(".ProseMirror");
+    if (!root || !onWikiLink) return;
+    const onClick = (e: Event) => {
+      const t = e.target as HTMLElement;
+      const a = t.closest("a.wikilink") as HTMLAnchorElement | null;
+      if (!a) return;
+      e.preventDefault();
+      const target = a.getAttribute("data-wikilink");
+      if (target) onWikiLink(target);
+    };
+    root.addEventListener("click", onClick);
+    return () => root.removeEventListener("click", onClick);
+  }, [onWikiLink, editor]);
+
+  const runAi = async (action: string, targetLang?: string) => {
+    setAiBusy(true);
+    try {
+      const res = await fetch("/api/ai", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action,
+          text: latestRef.current.content,
+          targetLang,
+        }),
+      });
+      const data = await res.json();
+      if (data.result) {
+        const block = `\n\n> [!note] AI (${action})\n> ${String(data.result).replace(/\n/g, "\n> ")}\n`;
+        const next = latestRef.current.content + block;
+        setRaw(next);
+        scheduleSave(next, latestRef.current.metadata);
+        editor?.commands.setContent(markdownToHtml(next), { emitUpdate: false });
+      } else if (data.error) {
+        alert(`${data.error}\n${data.hint || ""}`);
+      }
+    } finally {
+      setAiBusy(false);
+    }
+  };
+
+  const snapshotVersion = async () => {
+    await fetch("/api/versions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ path }),
+    });
+  };
+
+  const applySlash = (kind: string) => {
+    setSlashOpen(false);
+    if (!editor) return;
+    if (kind === "h1") editor.chain().focus().toggleHeading({ level: 1 }).run();
+    if (kind === "h2") editor.chain().focus().toggleHeading({ level: 2 }).run();
+    if (kind === "code")
+      editor.chain().focus().toggleCodeBlock({ language: codeLang }).run();
+    if (kind === "list") editor.chain().focus().toggleBulletList().run();
+    if (kind === "callout") {
+      const next =
+        latestRef.current.content +
+        `\n\n> [!info] Info\n> Your note here / Votre note ici\n\n`;
+      setRaw(next);
+      scheduleSave(next, latestRef.current.metadata);
+      editor.commands.setContent(markdownToHtml(next), { emitUpdate: false });
+    }
+    if (kind === "mermaid") {
+      const next =
+        latestRef.current.content +
+        `\n\n\`\`\`mermaid\nflowchart LR\n  A[Start] --> B[Note]\n\`\`\`\n\n`;
+      setRaw(next);
+      scheduleSave(next, latestRef.current.metadata);
+      editor.commands.setContent(markdownToHtml(next), { emitUpdate: false });
+    }
+    if (kind === "wiki") {
+      editor.chain().focus().insertContent("[[Note]]").run();
+    }
+  };
 
   useEffect(() => {
     if (!editor) return;
@@ -520,7 +676,55 @@ export function Editor({
           </button>
         </div>
 
-        <div className="ml-auto flex items-center gap-2 text-sm">
+        <div className="ml-auto flex flex-wrap items-center gap-2 text-sm">
+          <button
+            type="button"
+            onClick={() => setSlashOpen((v) => !v)}
+            className="h-8 rounded-md border border-stone-300 bg-white px-2 text-xs dark:border-stone-600 dark:bg-stone-800"
+            title="Slash commands"
+          >
+            /
+          </button>
+          <button
+            type="button"
+            disabled={aiBusy}
+            onClick={() => void runAi("summarize")}
+            className="h-8 rounded-md border border-stone-300 bg-white px-2 text-xs dark:border-stone-600 dark:bg-stone-800"
+          >
+            AI Résumé
+          </button>
+          <button
+            type="button"
+            disabled={aiBusy}
+            onClick={() => void runAi("tags")}
+            className="h-8 rounded-md border border-stone-300 bg-white px-2 text-xs dark:border-stone-600 dark:bg-stone-800"
+          >
+            AI Tags
+          </button>
+          <button
+            type="button"
+            disabled={aiBusy}
+            onClick={() => void runAi("translate", "en")}
+            className="h-8 rounded-md border border-stone-300 bg-white px-2 text-xs dark:border-stone-600 dark:bg-stone-800"
+          >
+            FR→EN
+          </button>
+          <button
+            type="button"
+            disabled={aiBusy}
+            onClick={() => void runAi("translate", "fr")}
+            className="h-8 rounded-md border border-stone-300 bg-white px-2 text-xs dark:border-stone-600 dark:bg-stone-800"
+          >
+            EN→FR
+          </button>
+          <button
+            type="button"
+            onClick={() => void snapshotVersion()}
+            className="h-8 rounded-md border border-stone-300 bg-white px-2 text-xs dark:border-stone-600 dark:bg-stone-800"
+            title="Snapshot version"
+          >
+            Snapshot
+          </button>
           <button
             type="button"
             onClick={() => setMode("document")}
@@ -528,7 +732,7 @@ export function Editor({
               "inline-flex items-center gap-1 rounded-md px-2.5 py-1.5 text-xs font-medium",
               mode === "document"
                 ? "bg-stone-900 text-white"
-                : "bg-white text-stone-700 border border-stone-300"
+                : "bg-white text-stone-700 border border-stone-300 dark:bg-stone-800 dark:text-stone-100 dark:border-stone-600"
             )}
           >
             <FileText className="h-3.5 w-3.5" /> Document
@@ -570,10 +774,34 @@ export function Editor({
         </div>
       </div>
 
+      {slashOpen ? (
+        <div className="absolute left-4 top-16 z-20 w-56 rounded-lg border border-[var(--border)] bg-[var(--panel)] p-1 shadow-xl">
+          {[
+            ["h1", "Titre H1"],
+            ["h2", "Titre H2"],
+            ["list", "Liste"],
+            ["code", "Bloc code"],
+            ["callout", "Callout"],
+            ["mermaid", "Mermaid"],
+            ["wiki", "Wikilink [[]]"],
+          ].map(([id, label]) => (
+            <button
+              key={id}
+              type="button"
+              className="block w-full rounded px-2 py-1.5 text-left text-xs hover:bg-[var(--panel-muted)]"
+              onClick={() => applySlash(id)}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      ) : null}
+
       {mode === "document" ? (
         <div className="relative min-h-0 flex-1 overflow-auto">
           <EditorContent editor={editor} />
           <CodeBlockChrome />
+          <MermaidPreview content={raw} />
         </div>
       ) : (
         <textarea
@@ -590,6 +818,24 @@ export function Editor({
           }}
         />
       )}
+    </div>
+  );
+}
+
+/** Render mermaid fences below the editor for live preview */
+function MermaidPreview({ content }: { content: string }) {
+  const charts = [...content.matchAll(/```mermaid\n([\s\S]*?)```/g)].map(
+    (m) => m[1]
+  );
+  if (charts.length === 0) return null;
+  return (
+    <div className="space-y-2 border-t border-[var(--border)] px-4 py-3">
+      <div className="text-[10px] font-semibold uppercase tracking-wider opacity-50">
+        Mermaid preview
+      </div>
+      {charts.map((c, i) => (
+        <MermaidBlock key={i} chart={c} />
+      ))}
     </div>
   );
 }

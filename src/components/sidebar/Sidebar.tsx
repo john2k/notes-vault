@@ -40,7 +40,7 @@ export function Sidebar({
   }, [notes]);
 
   return (
-    <aside className="flex h-full w-72 flex-col border-r border-stone-300/80 bg-[#f7f1e8]/90 backdrop-blur">
+    <aside className="flex h-full min-h-0 flex-1 flex-col bg-[var(--panel-muted)]/90 backdrop-blur">
       <div className="border-b border-stone-300/80 p-3">
         <div className="font-[family-name:var(--font-display)] text-lg font-semibold tracking-tight text-stone-900">
           Notes Vault

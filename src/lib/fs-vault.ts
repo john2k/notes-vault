@@ -9,10 +9,15 @@ export const VAULT_DIR = path.join(process.cwd(), "vault");
 export const DEFAULT_FOLDERS = [
   "Travail",
   "Personnel",
+  "Journal",
   "_inbox",
   "_trash",
   "_attachments",
   path.join("_attachments", "audio"),
+  path.join("_attachments", "images"),
+  "_templates",
+  "_snippets",
+  "_meta",
 ] as const;
 
 export interface NoteMetadata {
@@ -273,3 +278,181 @@ export async function readJsonFile<T = unknown>(
   const raw = await fs.readFile(fullPath, "utf-8");
   return JSON.parse(raw) as T;
 }
+
+/** List markdown templates under vault/_templates */
+export async function listTemplates(): Promise<
+  Array<{ path: string; title: string }>
+> {
+  await ensureVaultStructure();
+  const dir = path.join(VAULT_DIR, "_templates");
+  try {
+    const files = await fs.readdir(dir);
+    const out: Array<{ path: string; title: string }> = [];
+    for (const f of files) {
+      if (!f.endsWith(".md")) continue;
+      const rel = `_templates/${f}`;
+      try {
+        const note = await readNote(rel);
+        out.push({ path: rel, title: note.metadata.title || f });
+      } catch {
+        out.push({ path: rel, title: f.replace(/\.md$/, "") });
+      }
+    }
+    return out;
+  } catch {
+    return [];
+  }
+}
+
+/** List code snippets under vault/_snippets */
+export async function listSnippets(): Promise<
+  Array<{ path: string; title: string; content: string }>
+> {
+  await ensureVaultStructure();
+  const dir = path.join(VAULT_DIR, "_snippets");
+  try {
+    const files = await fs.readdir(dir);
+    const out: Array<{ path: string; title: string; content: string }> = [];
+    for (const f of files) {
+      if (!f.endsWith(".md")) continue;
+      const rel = `_snippets/${f}`;
+      const note = await readNote(rel);
+      out.push({
+        path: rel,
+        title: note.metadata.title || f.replace(/\.md$/, ""),
+        content: note.content,
+      });
+    }
+    return out;
+  } catch {
+    return [];
+  }
+}
+
+export interface SmartFolder {
+  id: string;
+  name: string;
+  tag?: string;
+  color?: string;
+  folder?: string;
+}
+
+export async function loadSmartFolders(): Promise<SmartFolder[]> {
+  await ensureVaultStructure();
+  try {
+    const data = await readJsonFile<{ folders?: SmartFolder[] }>(
+      "_meta/smart-folders.json"
+    );
+    return data.folders ?? [];
+  } catch {
+    return [];
+  }
+}
+
+export async function saveSmartFolders(folders: SmartFolder[]): Promise<void> {
+  await saveJsonAtomic("_meta/smart-folders.json", {
+    folders,
+    updated_at: new Date().toISOString(),
+  });
+}
+
+/**
+ * Snapshot note content into .data/versions (disposable history, not source of truth).
+ * Snapshot dans .data/versions (historique jetable, pas source de vérité).
+ */
+export async function saveNoteVersion(
+  relativePath: string,
+  content: string,
+  metadata: NoteMetadata
+): Promise<string> {
+  const dataDir = path.join(process.cwd(), ".data", "versions");
+  const safe = relativePath.replace(/[\\/]/g, "__");
+  const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+  const dir = path.join(dataDir, safe);
+  await fs.mkdir(dir, { recursive: true });
+  const file = path.join(dir, `${stamp}.json`);
+  await fs.writeFile(
+    file,
+    JSON.stringify({ relativePath, content, metadata, saved_at: stamp }, null, 2),
+    "utf-8"
+  );
+  return file;
+}
+
+export async function listNoteVersions(
+  relativePath: string
+): Promise<Array<{ id: string; saved_at: string }>> {
+  const dataDir = path.join(process.cwd(), ".data", "versions");
+  const safe = relativePath.replace(/[\\/]/g, "__");
+  const dir = path.join(dataDir, safe);
+  try {
+    const files = (await fs.readdir(dir))
+      .filter((f) => f.endsWith(".json"))
+      .sort()
+      .reverse();
+    return files.map((f) => ({
+      id: f,
+      saved_at: f.replace(/\.json$/, ""),
+    }));
+  } catch {
+    return [];
+  }
+}
+
+export async function readNoteVersion(
+  relativePath: string,
+  id: string
+): Promise<{ content: string; metadata: NoteMetadata }> {
+  const dataDir = path.join(process.cwd(), ".data", "versions");
+  const safe = relativePath.replace(/[\\/]/g, "__");
+  const file = path.join(dataDir, safe, id);
+  const raw = await fs.readFile(file, "utf-8");
+  const data = JSON.parse(raw) as {
+    content: string;
+    metadata: NoteMetadata;
+  };
+  return { content: data.content, metadata: data.metadata };
+}
+
+/** Extract [[wikilinks]] targets from markdown body */
+export function extractWikiLinks(content: string): string[] {
+  const re = /\[\[([^\]|#]+)(?:#[^\]|]+)?(?:\|[^\]]+)?\]\]/g;
+  const out: string[] = [];
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(content))) {
+    out.push(m[1].trim());
+  }
+  return [...new Set(out)];
+}
+
+/** Extract checklist tasks from markdown */
+export function extractTasks(
+  content: string,
+  notePath: string
+): Array<{
+  notePath: string;
+  line: number;
+  text: string;
+  done: boolean;
+}> {
+  const lines = content.split("\n");
+  const tasks: Array<{
+    notePath: string;
+    line: number;
+    text: string;
+    done: boolean;
+  }> = [];
+  lines.forEach((line, i) => {
+    const m = /^\s*[-*]\s+\[([ xX])\]\s+(.*)$/.exec(line);
+    if (m) {
+      tasks.push({
+        notePath,
+        line: i + 1,
+        text: m[2].trim(),
+        done: m[1].toLowerCase() === "x",
+      });
+    }
+  });
+  return tasks;
+}
+

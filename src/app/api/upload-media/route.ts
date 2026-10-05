@@ -47,6 +47,9 @@ export async function POST(request: NextRequest) {
   if (kind === "pdf") {
     const name = file.name.replace(/[^\w.\-]+/g, "_") || `doc-${stamp}.pdf`;
     relativeUnder = name;
+  } else if (kind === "image") {
+    const ext = (file.name.split(".").pop() || "png").toLowerCase();
+    relativeUnder = `images/img-${stamp}.${ext}`;
   } else {
     relativeUnder = `audio/audio-${stamp}.webm`;
   }

@@ -3,6 +3,7 @@ import fs from "fs";
 import path from "path";
 import {
   ensureVaultStructure,
+  extractWikiLinks,
   listVaultFiles,
   readNote,
   VAULT_DIR,
@@ -80,6 +81,12 @@ function getDb(): Database.Database {
       INSERT INTO notes_fts(rowid, path, title, body, tags)
       VALUES (new.rowid, new.path, new.title, new.body, new.tags);
     END;
+
+    CREATE TABLE IF NOT EXISTS links (
+      source TEXT NOT NULL,
+      target TEXT NOT NULL,
+      PRIMARY KEY (source, target)
+    );
   `);
 
   g.__notesVaultDb = db;
@@ -130,6 +137,29 @@ export async function rebuildIndex(): Promise<number> {
   }
 
   tx(rows);
+
+  // Rebuild wikilink index / Reconstruit l'index des wikilinks
+  const clearLinks = db.prepare("DELETE FROM links");
+  const insertLink = db.prepare(
+    "INSERT OR IGNORE INTO links (source, target) VALUES (?, ?)"
+  );
+  const linkTx = db.transaction(() => {
+    clearLinks.run();
+    for (const relativePath of files) {
+      try {
+        const note = rows.find((r) => r.path === relativePath);
+        if (!note) continue;
+        const body = String(note.body || "");
+        for (const target of extractWikiLinks(body)) {
+          insertLink.run(relativePath, target);
+        }
+      } catch {
+        // skip
+      }
+    }
+  });
+  linkTx();
+
   return rows.length;
 }
 
@@ -161,13 +191,77 @@ export async function upsertNoteInIndex(relativePath: string): Promise<void> {
       folder: path.posix.dirname(relativePath),
       body: note.content,
     });
+
+    db.prepare("DELETE FROM links WHERE source = ?").run(relativePath);
+    const insertLink = db.prepare(
+      "INSERT OR IGNORE INTO links (source, target) VALUES (?, ?)"
+    );
+    for (const target of extractWikiLinks(note.content)) {
+      insertLink.run(relativePath, target);
+    }
   } catch {
     removeNoteFromIndex(relativePath);
   }
 }
 
 export function removeNoteFromIndex(relativePath: string): void {
-  getDb().prepare("DELETE FROM notes WHERE path = ?").run(relativePath);
+  const db = getDb();
+  db.prepare("DELETE FROM notes WHERE path = ?").run(relativePath);
+  db.prepare("DELETE FROM links WHERE source = ?").run(relativePath);
+}
+
+/** Notes that link to a title or path fragment / Notes qui pointent vers un titre */
+export function getBacklinks(targetTitleOrPath: string): Array<{
+  path: string;
+  title: string;
+}> {
+  const db = getDb();
+  const target = targetTitleOrPath.replace(/\.md$/i, "");
+  const rows = db
+    .prepare(
+      `SELECT DISTINCT n.path, n.title
+       FROM links l
+       JOIN notes n ON n.path = l.source
+       WHERE lower(l.target) = lower(?)
+          OR lower(l.target) = lower(?)
+          OR lower(n.title) = lower(?)`
+    )
+    .all(target, path.posix.basename(target), target) as Array<{
+    path: string;
+    title: string;
+  }>;
+
+  // Also match by title of the target note
+  const byTitle = db
+    .prepare(
+      `SELECT DISTINCT n.path, n.title
+       FROM links l
+       JOIN notes n ON n.path = l.source
+       WHERE lower(l.target) IN (
+         SELECT lower(title) FROM notes WHERE lower(path) = lower(?) OR lower(title) = lower(?)
+       )`
+    )
+    .all(targetTitleOrPath, target) as Array<{ path: string; title: string }>;
+
+  const map = new Map<string, { path: string; title: string }>();
+  for (const r of [...rows, ...byTitle]) map.set(r.path, r);
+  return [...map.values()];
+}
+
+export function findNotePathByTitle(title: string): string | null {
+  const db = getDb();
+  const row = db
+    .prepare(
+      `SELECT path FROM notes WHERE lower(title) = lower(?) OR lower(path) = lower(?) LIMIT 1`
+    )
+    .get(title, title.endsWith(".md") ? title : `${title}.md`) as
+    | { path: string }
+    | undefined;
+  return row?.path ?? null;
+}
+
+export function getVaultRoot(): string {
+  return VAULT_DIR;
 }
 
 export function listIndexedNotes(filters?: {
@@ -219,8 +313,4 @@ export function searchNotes(query: string, limit = 25): SearchHit[] {
     // Syntaxe FTS invalide — retourne vide plutôt qu'une erreur 500
     return [];
   }
-}
-
-export function getVaultRoot(): string {
-  return VAULT_DIR;
 }
