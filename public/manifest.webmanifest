@@ -4,8 +4,8 @@
   "description": "Local-first markdown notes vault",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#ebe6dc",
-  "theme_color": "#0f766e",
+  "background_color": "#1e1e1e",
+  "theme_color": "#1e1e1e",
   "lang": "fr",
   "icons": [
     {

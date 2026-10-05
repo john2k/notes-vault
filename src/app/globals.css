@@ -18,18 +18,21 @@
 }
 
 .dark {
-  --background: #0c1118;
-  --background-accent: #12202b;
-  --foreground: #e8eef7;
-  --panel: #141c27;
-  --panel-muted: #1a2433;
-  --border: #2a3648;
-  --accent: #2dd4bf;
-  --accent-soft: #134e4a;
-  --note-color: #94a3b8;
-  --note-wash: rgba(148, 163, 184, 0.12);
-  --code-bg: #0b1220;
-  --code-fg: #e8eef7;
+  /* VS Code Dark+ inspired / inspiré Dark+ */
+  --background: #1e1e1e;
+  --background-accent: #252526;
+  --foreground: #d4d4d4;
+  --panel: #252526;
+  --panel-muted: #2d2d2d;
+  --border: #3c3c3c;
+  --accent: #3794ff;
+  --accent-soft: rgba(55, 148, 255, 0.12);
+  --note-color: #858585;
+  --note-wash: rgba(55, 148, 255, 0.06);
+  --code-bg: #1e1e1e;
+  --code-fg: #d4d4d4;
+  --selection: #264f78;
+  --muted: #9d9d9d;
 }
 
 body {
@@ -42,6 +45,11 @@ body {
   min-height: 100vh;
 }
 
+.dark body,
+html.dark body {
+  background: var(--background);
+}
+
 /* ─── Editor chrome ─── */
 
 .note-shell {
@@ -52,6 +60,11 @@ body {
     linear-gradient(180deg, var(--note-wash), transparent 120px),
     var(--panel);
   box-shadow: 0 10px 30px rgba(28, 25, 23, 0.06);
+}
+
+.dark .note-shell {
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  border-color: var(--border);
 }
 
 .wikilink {
@@ -86,7 +99,7 @@ body {
   font-family: var(--font-display), "Source Serif 4", serif;
   font-weight: 600;
   line-height: 1.25;
-  color: #1c1917;
+  color: var(--foreground);
 }
 
 .ProseMirror h1 {
@@ -126,7 +139,7 @@ body {
 .ProseMirror blockquote {
   border-left: 3px solid var(--note-color);
   padding-left: 0.9rem;
-  color: #57534e;
+  color: var(--muted, #57534e);
   font-style: italic;
 }
 
@@ -147,6 +160,12 @@ body {
   padding: 0.1em 0.35em;
 }
 
+.dark .ProseMirror :not(pre) > code {
+  background: #2d2d2d;
+  color: #ce9178;
+  border-color: #3c3c3c;
+}
+
 /* ─── Code blocks + syntax highlighting (lowlight / highlight.js) ─── */
 
 .ProseMirror pre,
@@ -154,16 +173,22 @@ body {
   position: relative;
   background: var(--code-bg);
   color: var(--code-fg);
-  border-radius: 0.75rem;
+  border-radius: 0.5rem;
   padding: 2.4rem 1rem 1rem;
   overflow-x: auto;
-  border: 1px solid #2a3648;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border);
+  box-shadow: none;
+}
+
+.dark .ProseMirror pre,
+.dark .code-block-shell {
+  background: #1e1e1e;
+  border-color: #3c3c3c;
 }
 
 .ProseMirror pre code,
 .code-block-shell code {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-family: Consolas, "Courier New", ui-monospace, monospace;
   font-size: 0.84rem;
   line-height: 1.55;
   background: transparent !important;
@@ -182,7 +207,7 @@ body {
   font-size: 0.65rem;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: #94a3b8;
+  color: #858585;
   font-family: var(--font-sans), sans-serif;
 }
 
@@ -192,23 +217,23 @@ body {
   top: 0.45rem;
   right: 0.55rem;
   font-size: 0.7rem;
-  border-radius: 0.4rem;
-  background: #334155;
-  color: #f8fafc;
+  border-radius: 0.25rem;
+  background: #2d2d2d;
+  color: #d4d4d4;
   padding: 0.2rem 0.55rem;
-  border: 1px solid #475569;
+  border: 1px solid #3c3c3c;
   cursor: pointer;
 }
 
 .ProseMirror pre .code-copy-btn:hover,
 .code-block-shell .code-copy-btn:hover {
-  background: #475569;
+  background: #3c3c3c;
 }
 
-/* highlight.js token colors — custom vault dark theme */
+/* highlight.js — VS Code Dark+ token colors */
 .hljs-comment,
 .hljs-quote {
-  color: #7d8da6;
+  color: #6a9955;
   font-style: italic;
 }
 
@@ -217,38 +242,47 @@ body {
 .hljs-literal,
 .hljs-section,
 .hljs-link {
-  color: #c792ea;
+  color: #569cd6;
 }
 
 .hljs-function .hljs-keyword {
-  color: #c792ea;
+  color: #569cd6;
 }
 
 .hljs-subst {
-  color: #e8eef7;
+  color: #d4d4d4;
 }
 
 .hljs-string,
+.hljs-addition,
+.hljs-attribute,
+.hljs-template-tag,
+.hljs-template-variable {
+  color: #ce9178;
+}
+
 .hljs-title,
 .hljs-name,
 .hljs-type,
-.hljs-attribute,
 .hljs-symbol,
-.hljs-bullet,
-.hljs-addition,
-.hljs-variable,
-.hljs-template-tag,
-.hljs-template-variable {
-  color: #c3e88d;
+.hljs-bullet {
+  color: #4ec9b0;
+}
+
+.hljs-variable {
+  color: #9cdcfe;
 }
 
 .hljs-number,
 .hljs-regexp,
-.hljs-meta,
+.hljs-deletion {
+  color: #b5cea8;
+}
+
 .hljs-built_in,
 .hljs-builtin-name,
-.hljs-deletion {
-  color: #f78c6c;
+.hljs-meta {
+  color: #dcdcaa;
 }
 
 .hljs-doctag,
@@ -258,11 +292,11 @@ body {
 .hljs-selector-class,
 .hljs-selector-attr,
 .hljs-selector-pseudo {
-  color: #82aaff;
+  color: #4ec9b0;
 }
 
 .hljs-params {
-  color: #f0c674;
+  color: #9cdcfe;
 }
 
 .hljs-emphasis {
@@ -279,13 +313,18 @@ mark {
   border-radius: 0.15em;
 }
 
-/* Raw mode textarea */
+.dark mark {
+  background: #264f78;
+  color: #d4d4d4;
+}
+
+/* Raw mode textarea — VS Code editor feel */
 .raw-editor {
-  background: #121820;
-  color: #e2e8f0;
-  caret-color: #5eead4;
+  background: #1e1e1e;
+  color: #d4d4d4;
+  caret-color: #aeafad;
 }
 
 .raw-editor::selection {
-  background: #334155;
+  background: #264f78;
 }
