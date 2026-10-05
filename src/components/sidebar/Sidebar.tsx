@@ -5,7 +5,8 @@ import { useEffect, useMemo, useState } from "react";
 import { cn, getNoteColor } from "@/lib/utils";
 import {
   NoteContextMenu,
-  type NoteContextAction,
+  type ContextTargetKind,
+  type VaultContextAction,
 } from "@/components/sidebar/NoteContextMenu";
 
 export interface SidebarNote {
@@ -18,11 +19,16 @@ export interface SidebarNote {
 
 interface SidebarProps {
   notes: SidebarNote[];
+  folders?: string[];
   activePath?: string | null;
   onSelect: (path: string) => void;
   onCreate: (folder: string) => void;
   onSearch: (query: string) => void;
-  onNoteAction?: (action: NoteContextAction, path: string) => void;
+  onNoteAction?: (
+    action: VaultContextAction,
+    path: string,
+    kind: ContextTargetKind
+  ) => void;
 }
 
 const COLLAPSE_KEY = "notes-vault-collapsed-folders";
@@ -40,6 +46,7 @@ function loadCollapsed(): Set<string> {
 
 export function Sidebar({
   notes,
+  folders = [],
   activePath,
   onSelect,
   onCreate,
@@ -53,6 +60,7 @@ export function Sidebar({
     y: number;
     path: string;
     title: string;
+    kind: ContextTargetKind;
   } | null>(null);
 
   useEffect(() => {
@@ -69,13 +77,16 @@ export function Sidebar({
 
   const grouped = useMemo(() => {
     const map = new Map<string, SidebarNote[]>();
+    for (const folder of folders) {
+      if (!map.has(folder)) map.set(folder, []);
+    }
     for (const note of notes) {
       const folder = note.folder || ".";
       if (!map.has(folder)) map.set(folder, []);
       map.get(folder)!.push(note);
     }
     return [...map.entries()].sort(([a], [b]) => a.localeCompare(b));
-  }, [notes]);
+  }, [notes, folders]);
 
   useEffect(() => {
     if (!activePath) return;
@@ -133,13 +144,31 @@ export function Sidebar({
       <div className="flex-1 overflow-auto p-2">
         {grouped.map(([folder, items]) => {
           const isCollapsed = collapsed.has(folder);
+          const depth = folder === "." ? 0 : folder.split("/").length - 1;
+          const label =
+            folder === "." ? "Racine" : folder.split("/").pop() || folder;
           return (
-            <div key={folder} className="mb-1">
+            <div key={folder} className="mb-1" style={{ marginLeft: depth * 8 }}>
               <button
                 type="button"
                 onClick={() => toggleFolder(folder)}
+                onContextMenu={(e) => {
+                  e.preventDefault();
+                  if (folder === ".") return;
+                  setMenu({
+                    x: e.clientX,
+                    y: e.clientY,
+                    path: folder,
+                    title: label,
+                    kind: "folder",
+                  });
+                }}
                 className="mb-0.5 flex w-full items-center gap-1 rounded-md px-1.5 py-1 text-left text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--muted,#858585)] hover:bg-[var(--panel-muted)] hover:text-[var(--foreground)]"
-                title={isCollapsed ? "Ouvrir / Expand" : "Fermer / Collapse"}
+                title={
+                  isCollapsed
+                    ? "Ouvrir · clic droit pour options"
+                    : "Fermer · clic droit pour options"
+                }
                 aria-expanded={!isCollapsed}
               >
                 {isCollapsed ? (
@@ -148,7 +177,9 @@ export function Sidebar({
                   <ChevronDown className="h-3.5 w-3.5 shrink-0" />
                 )}
                 <Folder className="h-3.5 w-3.5 shrink-0" />
-                <span className="truncate">{folder}</span>
+                <span className="truncate" title={folder}>
+                  {folder === "." ? label : folder}
+                </span>
                 <span className="ml-auto tabular-nums opacity-60">
                   {items.length}
                 </span>
@@ -171,6 +202,7 @@ export function Sidebar({
                               y: e.clientY,
                               path: note.path,
                               title: note.title,
+                              kind: "note",
                             });
                           }}
                           className={cn(
@@ -215,8 +247,9 @@ export function Sidebar({
         y={menu?.y || 0}
         path={menu?.path || ""}
         title={menu?.title || ""}
+        kind={menu?.kind || "note"}
         onClose={() => setMenu(null)}
-        onAction={(action, path) => onNoteAction?.(action, path)}
+        onAction={(action, path, kind) => onNoteAction?.(action, path, kind)}
       />
     </aside>
   );

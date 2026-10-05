@@ -2,7 +2,10 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { Sidebar, type SidebarNote } from "@/components/sidebar/Sidebar";
-import type { NoteContextAction } from "@/components/sidebar/NoteContextMenu";
+import type {
+  ContextTargetKind,
+  VaultContextAction,
+} from "@/components/sidebar/NoteContextMenu";
 import { Editor } from "@/components/editor/Editor";
 import { AudioRecorder } from "@/components/media/AudioRecorder";
 import { CommandPalette } from "@/components/command/CommandPalette";
@@ -24,6 +27,7 @@ interface NotePayload {
 
 export function WorkspaceApp() {
   const [notes, setNotes] = useState<SidebarNote[]>([]);
+  const [folders, setFolders] = useState<string[]>([]);
   const [activePath, setActivePath] = useState<string | null>(null);
   const [note, setNote] = useState<NotePayload | null>(null);
   const [liveContent, setLiveContent] = useState("");
@@ -35,14 +39,24 @@ export function WorkspaceApp() {
   const [templatesOpen, setTemplatesOpen] = useState(false);
   const [insertBuf, setInsertBuf] = useState<string | null>(null);
 
-  const refreshList = useCallback(async (search?: string) => {
-    const url = search
-      ? `/api/notes?search=${encodeURIComponent(search)}`
-      : "/api/notes";
-    const res = await fetch(url);
+  const refreshFolders = useCallback(async () => {
+    const res = await fetch("/api/notes/actions?list=folders");
     const data = await res.json();
-    setNotes(data.notes || []);
+    setFolders(data.folders || []);
   }, []);
+
+  const refreshList = useCallback(
+    async (search?: string) => {
+      const url = search
+        ? `/api/notes?search=${encodeURIComponent(search)}`
+        : "/api/notes";
+      const res = await fetch(url);
+      const data = await res.json();
+      setNotes(data.notes || []);
+      await refreshFolders();
+    },
+    [refreshFolders]
+  );
 
   const openNote = useCallback(async (path: string) => {
     setError(null);
@@ -204,16 +218,160 @@ export function WorkspaceApp() {
     setNotes(list);
   };
 
-  const handleNoteAction = async (action: NoteContextAction, path: string) => {
+  const downloadBlob = async (
+    res: Response,
+    fallbackName: string
+  ): Promise<void> => {
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(
+        (data as { error?: string }).error || "Export failed"
+      );
+    }
+    const blob = await res.blob();
+    const disp = res.headers.get("Content-Disposition") || "";
+    const match = /filename="([^"]+)"/.exec(disp);
+    const filename = match?.[1] || fallbackName;
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleNoteAction = async (
+    action: VaultContextAction,
+    path: string,
+    kind: ContextTargetKind
+  ) => {
     try {
+      if (kind === "folder") {
+        if (action === "rename") {
+          const current = path.split("/").pop() || path;
+          const name = window.prompt("Nouveau nom / New name", current);
+          if (!name?.trim() || name.trim() === current) return;
+          const res = await fetch("/api/notes/actions", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              action: "rename-folder",
+              path,
+              name: name.trim(),
+            }),
+          });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || "Rename failed");
+          await refreshList();
+          if (activePath?.startsWith(`${path}/`)) {
+            const next = activePath.replace(path, data.path as string);
+            await openNote(next);
+          }
+          return;
+        }
+
+        if (action === "move") {
+          const choice = window.prompt(
+            `Dossier parent cible (vide = racine) / Parent folder (empty = root):\n${folders.join(", ")}`,
+            path.includes("/") ? path.split("/").slice(0, -1).join("/") : ""
+          );
+          if (choice === null) return;
+          const res = await fetch("/api/notes/actions", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              action: "move-folder",
+              path,
+              folder: choice.trim(),
+            }),
+          });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || "Move failed");
+          await refreshList();
+          return;
+        }
+
+        if (action === "new-subfolder") {
+          const name = window.prompt("Nom du sous-dossier / Subfolder name");
+          if (!name?.trim()) return;
+          const res = await fetch("/api/notes/actions", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              action: "create-folder",
+              parent: path,
+              name: name.trim(),
+            }),
+          });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || "Create failed");
+          await refreshList();
+          return;
+        }
+
+        if (action === "copy") {
+          const res = await fetch("/api/notes/actions", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ action: "copy-folder", path }),
+          });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || "Copy failed");
+          await refreshList();
+          return;
+        }
+
+        if (action === "export-zip") {
+          const res = await fetch("/api/notes/actions", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ action: "export-folder", path }),
+          });
+          await downloadBlob(res, `${path.split("/").pop() || "folder"}.zip`);
+          return;
+        }
+
+        if (action === "trash") {
+          if (
+            !window.confirm(
+              `Envoyer le dossier « ${path} » et son contenu à la corbeille ?`
+            )
+          ) {
+            return;
+          }
+          const res = await fetch("/api/notes/actions", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ action: "trash-folder", path }),
+          });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || "Trash failed");
+          await refreshList();
+          if (activePath === path || activePath?.startsWith(`${path}/`)) {
+            setNote(null);
+            setActivePath(null);
+          }
+          return;
+        }
+        return;
+      }
+
+      // —— note actions ——
       if (action === "rename") {
         const current = notes.find((n) => n.path === path);
-        const title = window.prompt("Nouveau titre / New title", current?.title || "");
+        const title = window.prompt(
+          "Nouveau titre / New title",
+          current?.title || ""
+        );
         if (!title?.trim()) return;
         const res = await fetch("/api/notes/actions", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ action: "rename", path, title: title.trim() }),
+          body: JSON.stringify({
+            action: "rename",
+            path,
+            title: title.trim(),
+          }),
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || "Rename failed");
@@ -223,12 +381,11 @@ export function WorkspaceApp() {
       }
 
       if (action === "move") {
-        const foldersRes = await fetch("/api/notes/actions?list=folders");
-        const foldersData = await foldersRes.json();
-        const folders = (foldersData.folders || []) as string[];
         const choice = window.prompt(
           `Dossier cible / Target folder:\n${folders.join(", ")}`,
-          path.includes("/") ? path.split("/").slice(0, -1).join("/") : "_inbox"
+          path.includes("/")
+            ? path.split("/").slice(0, -1).join("/")
+            : "_inbox"
         );
         if (!choice?.trim()) return;
         const res = await fetch("/api/notes/actions", {
@@ -260,24 +417,23 @@ export function WorkspaceApp() {
         return;
       }
 
-      if (action === "export") {
+      if (
+        action === "export-md" ||
+        action === "export-html" ||
+        action === "export-txt" ||
+        action === "export-json"
+      ) {
+        const format = action.replace("export-", "");
         const res = await fetch("/api/notes/actions", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ action: "export", path }),
+          body: JSON.stringify({ action: "export", path, format }),
         });
-        if (!res.ok) {
-          const data = await res.json();
-          throw new Error(data.error || "Export failed");
-        }
-        const blob = await res.blob();
-        const filename = path.split("/").pop() || "note.md";
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = filename;
-        a.click();
-        URL.revokeObjectURL(url);
+        await downloadBlob(
+          res,
+          path.split("/").pop()?.replace(/\.md$/i, `.${format}`) ||
+            `note.${format}`
+        );
         return;
       }
 
@@ -304,11 +460,14 @@ export function WorkspaceApp() {
       <div className="flex h-full w-72 flex-col border-r border-[var(--border)] bg-[var(--panel)]">
         <Sidebar
           notes={notes}
+          folders={folders}
           activePath={activePath}
           onSelect={(p) => void openNote(p)}
           onCreate={() => setTemplatesOpen(true)}
           onSearch={(q) => void refreshList(q || undefined)}
-          onNoteAction={(action, path) => void handleNoteAction(action, path)}
+          onNoteAction={(action, path, kind) =>
+            void handleNoteAction(action, path, kind)
+          }
         />
         <SmartFolders onApply={(f) => void applySmartFilter(f)} />
       </div>
