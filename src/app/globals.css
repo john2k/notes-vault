@@ -67,6 +67,19 @@ html.dark body {
   border-color: var(--border);
 }
 
+.editor-toolbar {
+  background: var(--panel-muted);
+}
+
+.dark .editor-toolbar {
+  background: #252526;
+}
+
+.toolbar-control option {
+  background: var(--panel);
+  color: var(--foreground);
+}
+
 .wikilink {
   color: var(--accent);
   text-decoration: underline;

@@ -280,10 +280,10 @@ function ToolbarButton({
       title={title}
       onClick={onClick}
       className={cn(
-        "inline-flex h-8 w-8 items-center justify-center rounded-md border text-stone-700 transition",
+        "inline-flex h-8 w-8 items-center justify-center rounded-md border transition",
         active
-          ? "border-teal-700 bg-teal-700 text-white"
-          : "border-transparent bg-transparent hover:border-stone-300 hover:bg-white"
+          ? "border-[var(--accent)] bg-[var(--accent)] text-white"
+          : "border-transparent bg-transparent text-[var(--foreground)] hover:bg-[var(--panel-muted)]"
       )}
     >
       {children}
@@ -294,7 +294,7 @@ function ToolbarButton({
 function FormatToolbar({ editor }: { editor: TiptapEditor | null }) {
   if (!editor) return null;
   return (
-    <div className="flex flex-wrap items-center gap-0.5 border-r border-stone-300 pr-2">
+    <div className="flex flex-wrap items-center gap-0.5 border-r border-[var(--border)] pr-2">
       <ToolbarButton
         title="Bold"
         active={editor.isActive("bold")}
@@ -624,7 +624,7 @@ export function Editor({
 
   return (
     <div
-      className="note-shell flex h-full flex-col overflow-hidden rounded-xl border border-stone-300"
+      className="note-shell flex h-full flex-col overflow-hidden rounded-xl border border-[var(--border)]"
       style={
         {
           "--note-color": palette.solid,
@@ -632,9 +632,9 @@ export function Editor({
         } as React.CSSProperties
       }
     >
-      <div className="flex flex-wrap items-center gap-2 border-b border-stone-200 bg-[#fffaf3]/70 px-3 py-2 backdrop-blur">
+      <div className="editor-toolbar flex flex-wrap items-center gap-2 border-b border-[var(--border)] bg-[var(--panel-muted)] px-3 py-2">
         <div className="flex items-center gap-1.5 pr-2">
-          <span className="mr-1 text-[10px] font-semibold uppercase tracking-wider text-stone-500">
+          <span className="mr-1 text-[10px] font-semibold uppercase tracking-wider text-[var(--muted,#858585)]">
             Couleur
           </span>
           {NOTE_COLORS.map((c) => (
@@ -644,8 +644,8 @@ export function Editor({
               title={c.label}
               onClick={() => updateColor(c.id)}
               className={cn(
-                "h-6 w-6 rounded-full border-2 border-white shadow-sm transition hover:scale-110",
-                metadata.color === c.id && "ring-2 ring-offset-2 ring-stone-800"
+                "h-6 w-6 rounded-full border-2 border-[var(--panel)] shadow-sm transition hover:scale-110",
+                metadata.color === c.id && "ring-2 ring-offset-2 ring-[var(--accent)] ring-offset-[var(--panel-muted)]"
               )}
               style={{ background: c.solid }}
             />
@@ -656,7 +656,7 @@ export function Editor({
 
         <div className="flex items-center gap-1">
           <select
-            className="h-8 rounded-md border border-stone-300 bg-white px-2 text-xs text-stone-700"
+            className="toolbar-control h-8 rounded-md border border-[var(--border)] bg-[var(--panel)] px-2 text-xs text-[var(--foreground)]"
             value={codeLang}
             onChange={(e) => setActiveCodeLanguage(e.target.value)}
             title="Code language / Langage code"
@@ -670,7 +670,7 @@ export function Editor({
           <button
             type="button"
             onClick={insertCodeBlock}
-            className="h-8 rounded-md border border-stone-300 bg-white px-2 text-xs text-stone-700 hover:bg-stone-50"
+            className="toolbar-control h-8 rounded-md border border-[var(--border)] bg-[var(--panel)] px-2 text-xs text-[var(--foreground)] hover:bg-[var(--panel-muted)]"
           >
             Insert code
           </button>
@@ -680,7 +680,7 @@ export function Editor({
           <button
             type="button"
             onClick={() => setSlashOpen((v) => !v)}
-            className="h-8 rounded-md border border-stone-300 bg-white px-2 text-xs dark:border-stone-600 dark:bg-stone-800"
+            className="toolbar-control h-8 rounded-md border border-[var(--border)] bg-[var(--panel)] px-2 text-xs text-[var(--foreground)]"
             title="Slash commands"
           >
             /
@@ -689,7 +689,7 @@ export function Editor({
             type="button"
             disabled={aiBusy}
             onClick={() => void runAi("summarize")}
-            className="h-8 rounded-md border border-stone-300 bg-white px-2 text-xs dark:border-stone-600 dark:bg-stone-800"
+            className="toolbar-control h-8 rounded-md border border-[var(--border)] bg-[var(--panel)] px-2 text-xs text-[var(--foreground)] disabled:opacity-40"
           >
             AI Résumé
           </button>
@@ -697,7 +697,7 @@ export function Editor({
             type="button"
             disabled={aiBusy}
             onClick={() => void runAi("tags")}
-            className="h-8 rounded-md border border-stone-300 bg-white px-2 text-xs dark:border-stone-600 dark:bg-stone-800"
+            className="toolbar-control h-8 rounded-md border border-[var(--border)] bg-[var(--panel)] px-2 text-xs text-[var(--foreground)] disabled:opacity-40"
           >
             AI Tags
           </button>
@@ -705,7 +705,7 @@ export function Editor({
             type="button"
             disabled={aiBusy}
             onClick={() => void runAi("translate", "en")}
-            className="h-8 rounded-md border border-stone-300 bg-white px-2 text-xs dark:border-stone-600 dark:bg-stone-800"
+            className="toolbar-control h-8 rounded-md border border-[var(--border)] bg-[var(--panel)] px-2 text-xs text-[var(--foreground)] disabled:opacity-40"
           >
             FR→EN
           </button>
@@ -713,14 +713,14 @@ export function Editor({
             type="button"
             disabled={aiBusy}
             onClick={() => void runAi("translate", "fr")}
-            className="h-8 rounded-md border border-stone-300 bg-white px-2 text-xs dark:border-stone-600 dark:bg-stone-800"
+            className="toolbar-control h-8 rounded-md border border-[var(--border)] bg-[var(--panel)] px-2 text-xs text-[var(--foreground)] disabled:opacity-40"
           >
             EN→FR
           </button>
           <button
             type="button"
             onClick={() => void snapshotVersion()}
-            className="h-8 rounded-md border border-stone-300 bg-white px-2 text-xs dark:border-stone-600 dark:bg-stone-800"
+            className="toolbar-control h-8 rounded-md border border-[var(--border)] bg-[var(--panel)] px-2 text-xs text-[var(--foreground)]"
             title="Snapshot version"
           >
             Snapshot
@@ -731,8 +731,8 @@ export function Editor({
             className={cn(
               "inline-flex items-center gap-1 rounded-md px-2.5 py-1.5 text-xs font-medium",
               mode === "document"
-                ? "bg-stone-900 text-white"
-                : "bg-white text-stone-700 border border-stone-300 dark:bg-stone-800 dark:text-stone-100 dark:border-stone-600"
+                ? "bg-[var(--accent)] text-white"
+                : "border border-[var(--border)] bg-[var(--panel)] text-[var(--foreground)]"
             )}
           >
             <FileText className="h-3.5 w-3.5" /> Document
@@ -743,8 +743,8 @@ export function Editor({
             className={cn(
               "inline-flex items-center gap-1 rounded-md px-2.5 py-1.5 text-xs font-medium",
               mode === "raw"
-                ? "bg-stone-900 text-white"
-                : "bg-white text-stone-700 border border-stone-300"
+                ? "bg-[var(--accent)] text-white"
+                : "border border-[var(--border)] bg-[var(--panel)] text-[var(--foreground)]"
             )}
           >
             <Code2 className="h-3.5 w-3.5" /> Code brut
@@ -752,10 +752,10 @@ export function Editor({
           <button
             type="button"
             onClick={() => void copyAllCode()}
-            className="inline-flex items-center gap-1 rounded-md border border-stone-300 bg-white px-2.5 py-1.5 text-xs"
+            className="inline-flex items-center gap-1 rounded-md border border-[var(--border)] bg-[var(--panel)] px-2.5 py-1.5 text-xs text-[var(--foreground)]"
           >
             {copied ? (
-              <Check className="h-3.5 w-3.5 text-emerald-600" />
+              <Check className="h-3.5 w-3.5 text-emerald-500" />
             ) : (
               <Copy className="h-3.5 w-3.5" />
             )}
@@ -765,8 +765,8 @@ export function Editor({
             className={cn(
               "rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide",
               saving
-                ? "bg-amber-100 text-amber-800"
-                : "bg-emerald-100 text-emerald-800"
+                ? "bg-amber-500/15 text-amber-700 dark:text-amber-300"
+                : "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"
             )}
           >
             {saving ? "Saving…" : "Saved"}
