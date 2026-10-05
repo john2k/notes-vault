@@ -10,22 +10,58 @@ pinned: true
 
 # Notes Vault
 
-Local-first markdown notes. The `vault/` folder is the source of truth.
+Local-first markdown notes. The `vault/` folder is the **source of truth**.
 
-Coffre de notes markdown local-first. Le dossier `vault/` est la source de vérité.
+Coffre de notes markdown local-first. Le dossier `vault/` est la **source de vérité**.
 
 ## Checklist
 
 - [x] Project scaffolded / Projet initialisé
-- [ ] Deploy on Proxmox LXC / Déployer sur LXC Proxmox
-- [ ] Configure Unraid backup / Configurer la sauvegarde Unraid
+- [x] Color themes + syntax highlighting / Thèmes couleur + coloration
+- [ ] Deploy tunings (SMB Unraid + rclone)
+- [ ] HomeHub embeds
 
-## Code sample
+## PowerShell
 
 ```powershell
-Get-ChildItem -Path C:\Users\John\Project\Notes-JD\vault
+Get-ChildItem -Path C:\Users\John\Project\Notes-JD\vault -Recurse |
+  Where-Object { $_.Extension -eq '.md' } |
+  Select-Object FullName, Length
 ```
 
+## Bash
+
 ```bash
-pnpm dev
+curl -s http://10.1.1.131:3000/api/notes | jq '.notes[].title'
+```
+
+## JSON
+
+```json
+{
+  "title": "Quick capture",
+  "tags": ["inbox", "homelab"],
+  "color": "orange"
+}
+```
+
+## INI
+
+```ini
+[notes-vault]
+host=10.1.1.131
+port=3000
+vault=/opt/notes-vault/vault
+```
+
+## YAML
+
+```yaml
+service:
+  name: notes-vault
+  image: local
+  ports:
+    - "3000:3000"
+  env:
+    HOMEHUB_API_TOKEN: "${HOMEHUB_API_TOKEN}"
 ```

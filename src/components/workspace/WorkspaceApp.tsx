@@ -95,7 +95,7 @@ export function WorkspaceApp() {
   };
 
   return (
-    <div className="flex h-screen bg-[radial-gradient(circle_at_top_left,#f4f4f5,transparent_40%),linear-gradient(180deg,#fafafa,#f4f4f5)]">
+    <div className="flex h-screen">
       <Sidebar
         notes={notes}
         activePath={activePath}
@@ -104,16 +104,22 @@ export function WorkspaceApp() {
         onSearch={(q) => void refreshList(q || undefined)}
       />
       <main className="flex min-w-0 flex-1 flex-col gap-3 p-4">
-        <header className="flex items-center justify-between">
+        <header className="flex items-center justify-between rounded-xl border border-stone-300/70 bg-[#fffdf8]/80 px-4 py-3 shadow-sm backdrop-blur">
           <div>
-            <h1 className="text-lg font-semibold text-zinc-900">
+            <h1 className="font-[family-name:var(--font-display)] text-xl font-semibold text-stone-900">
               {note?.metadata.title || "Notes Vault"}
             </h1>
-            <p className="text-xs text-zinc-500">{activePath || "—"}</p>
+            <p className="font-mono text-[11px] text-stone-500">{activePath || "—"}</p>
           </div>
-          {note ? (
-            <AudioRecorder onUploaded={insertAudioLink} />
-          ) : null}
+          <div className="flex items-center gap-3">
+            <a
+              href="/canvas"
+              className="rounded-md border border-stone-300 bg-white px-2.5 py-1.5 text-xs text-stone-700 hover:bg-stone-50"
+            >
+              Canvas
+            </a>
+            {note ? <AudioRecorder onUploaded={insertAudioLink} /> : null}
+          </div>
         </header>
 
         {error ? (
@@ -136,8 +142,8 @@ export function WorkspaceApp() {
             />
           </div>
         ) : (
-          <div className="flex flex-1 items-center justify-center text-sm text-zinc-500">
-            Select or create a note / Sélectionnez ou créez une note
+          <div className="flex flex-1 items-center justify-center text-sm text-stone-500">
+            Sélectionnez ou créez une note / Select or create a note
           </div>
         )}
       </main>
