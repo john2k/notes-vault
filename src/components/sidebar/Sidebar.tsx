@@ -1,7 +1,7 @@
 "use client";
 
-import { FilePlus2, Folder, Search } from "lucide-react";
-import { useMemo, useState } from "react";
+import { ChevronDown, ChevronRight, FilePlus2, Folder, Search } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 import { cn, getNoteColor } from "@/lib/utils";
 
 export interface SidebarNote {
@@ -20,6 +20,23 @@ interface SidebarProps {
   onSearch: (query: string) => void;
 }
 
+const COLLAPSE_KEY = "notes-vault-collapsed-folders";
+
+function loadCollapsed(): Set<string> {
+  if (typeof window === "undefined") return new Set();
+  try {
+    const raw = localStorage.getItem(COLLAPSE_KEY);
+    if (!raw) return new Set();
+    return new Set(JSON.parse(raw) as string[]);
+  } catch {
+    return new Set();
+  }
+}
+
+/**
+ * Sidebar tree with collapsible folders.
+ * Arborescence sidebar avec dossiers repliables.
+ */
 export function Sidebar({
   notes,
   activePath,
@@ -28,6 +45,19 @@ export function Sidebar({
   onSearch,
 }: SidebarProps) {
   const [query, setQuery] = useState("");
+  const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set());
+
+  useEffect(() => {
+    setCollapsed(loadCollapsed());
+  }, []);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(COLLAPSE_KEY, JSON.stringify([...collapsed]));
+    } catch {
+      // ignore quota / private mode
+    }
+  }, [collapsed]);
 
   const grouped = useMemo(() => {
     const map = new Map<string, SidebarNote[]>();
@@ -38,6 +68,29 @@ export function Sidebar({
     }
     return [...map.entries()].sort(([a], [b]) => a.localeCompare(b));
   }, [notes]);
+
+  // Keep the active note's folder expanded
+  useEffect(() => {
+    if (!activePath) return;
+    const folder = activePath.includes("/")
+      ? activePath.split("/").slice(0, -1).join("/")
+      : ".";
+    setCollapsed((prev) => {
+      if (!prev.has(folder)) return prev;
+      const next = new Set(prev);
+      next.delete(folder);
+      return next;
+    });
+  }, [activePath]);
+
+  const toggleFolder = (folder: string) => {
+    setCollapsed((prev) => {
+      const next = new Set(prev);
+      if (next.has(folder)) next.delete(folder);
+      else next.add(folder);
+      return next;
+    });
+  };
 
   return (
     <aside className="flex h-full min-h-0 flex-1 flex-col bg-[var(--panel)]">
@@ -71,53 +124,73 @@ export function Sidebar({
       </div>
 
       <div className="flex-1 overflow-auto p-2">
-        {grouped.map(([folder, items]) => (
-          <div key={folder} className="mb-3">
-            <div className="mb-1 flex items-center gap-1.5 px-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--muted,#858585)]">
-              <Folder className="h-3.5 w-3.5" />
-              {folder}
-            </div>
-            <ul className="space-y-0.5">
-              {items.map((note) => {
-                const color = getNoteColor(note.color);
-                const active = activePath === note.path;
-                return (
-                  <li key={note.path}>
-                    <button
-                      type="button"
-                      onClick={() => onSelect(note.path)}
-                      className={cn(
-                        "flex w-full items-center gap-2 rounded-md border-l-[3px] px-2 py-1.5 text-left text-sm transition",
-                        active
-                          ? "bg-[var(--accent-soft)] text-[var(--foreground)]"
-                          : "text-[var(--foreground)] hover:bg-[var(--panel-muted)]"
-                      )}
-                      style={{ borderLeftColor: color.solid }}
-                    >
-                      <span
-                        className="h-2.5 w-2.5 shrink-0 rounded-full"
-                        style={{ background: color.solid }}
-                      />
-                      <span className="truncate">{note.title}</span>
-                      {note.pinned ? (
-                        <span
+        {grouped.map(([folder, items]) => {
+          const isCollapsed = collapsed.has(folder);
+          return (
+            <div key={folder} className="mb-1">
+              <button
+                type="button"
+                onClick={() => toggleFolder(folder)}
+                className="mb-0.5 flex w-full items-center gap-1 rounded-md px-1.5 py-1 text-left text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--muted,#858585)] hover:bg-[var(--panel-muted)] hover:text-[var(--foreground)]"
+                title={isCollapsed ? "Ouvrir / Expand" : "Fermer / Collapse"}
+                aria-expanded={!isCollapsed}
+              >
+                {isCollapsed ? (
+                  <ChevronRight className="h-3.5 w-3.5 shrink-0" />
+                ) : (
+                  <ChevronDown className="h-3.5 w-3.5 shrink-0" />
+                )}
+                <Folder className="h-3.5 w-3.5 shrink-0" />
+                <span className="truncate">{folder}</span>
+                <span className="ml-auto tabular-nums opacity-60">
+                  {items.length}
+                </span>
+              </button>
+
+              {!isCollapsed ? (
+                <ul className="space-y-0.5 pl-1">
+                  {items.map((note) => {
+                    const color = getNoteColor(note.color);
+                    const active = activePath === note.path;
+                    return (
+                      <li key={note.path}>
+                        <button
+                          type="button"
+                          onClick={() => onSelect(note.path)}
                           className={cn(
-                            "ml-auto text-[9px] uppercase tracking-wide",
+                            "flex w-full items-center gap-2 rounded-md border-l-[3px] px-2 py-1.5 text-left text-sm transition",
                             active
-                              ? "text-[var(--accent)]"
-                              : "text-[var(--muted,#858585)]"
+                              ? "bg-[var(--accent-soft)] text-[var(--foreground)]"
+                              : "text-[var(--foreground)] hover:bg-[var(--panel-muted)]"
                           )}
+                          style={{ borderLeftColor: color.solid }}
                         >
-                          pin
-                        </span>
-                      ) : null}
-                    </button>
-                  </li>
-                );
-              })}
-            </ul>
-          </div>
-        ))}
+                          <span
+                            className="h-2.5 w-2.5 shrink-0 rounded-full"
+                            style={{ background: color.solid }}
+                          />
+                          <span className="truncate">{note.title}</span>
+                          {note.pinned ? (
+                            <span
+                              className={cn(
+                                "ml-auto text-[9px] uppercase tracking-wide",
+                                active
+                                  ? "text-[var(--accent)]"
+                                  : "text-[var(--muted,#858585)]"
+                              )}
+                            >
+                              pin
+                            </span>
+                          ) : null}
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              ) : null}
+            </div>
+          );
+        })}
       </div>
     </aside>
   );
