@@ -204,8 +204,8 @@ export function WorkspaceApp() {
   };
 
   return (
-    <div className="flex h-screen">
-      <div className="flex h-full w-72 flex-col border-r border-[var(--border)]">
+    <div className="flex h-screen bg-[var(--background)]">
+      <div className="flex h-full w-72 flex-col border-r border-[var(--border)] bg-[var(--panel)]">
         <Sidebar
           notes={notes}
           activePath={activePath}

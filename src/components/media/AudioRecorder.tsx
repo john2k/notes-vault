@@ -93,26 +93,26 @@ export function AudioRecorder({ onUploaded }: AudioRecorderProps) {
   const ss = String(seconds % 60).padStart(2, "0");
 
   return (
-    <div className="inline-flex items-center gap-2 rounded-md border bg-white px-2 py-1 text-sm">
+    <div className="inline-flex items-center gap-2 rounded-md border border-[var(--border)] bg-[var(--panel)] px-2 py-1 text-sm text-[var(--foreground)]">
       {!recording ? (
         <button
           type="button"
           disabled={busy}
           onClick={() => void start()}
-          className="inline-flex items-center gap-1 rounded bg-rose-600 px-2 py-1 text-white"
+          className="inline-flex items-center gap-1 rounded bg-[#c72e0f] px-2 py-1 text-white hover:bg-[#a5260c]"
         >
           <Mic className="h-3.5 w-3.5" />
-          Record / Enregistrer
+          Record
         </button>
       ) : (
         <>
-          <span className="font-mono text-xs tabular-nums text-rose-700">
+          <span className="font-mono text-xs tabular-nums text-[#f48771]">
             {mm}:{ss}
           </span>
           <button
             type="button"
             onClick={pause}
-            className="inline-flex items-center gap-1 rounded bg-amber-100 px-2 py-1"
+            className="inline-flex items-center gap-1 rounded border border-[var(--border)] bg-[var(--panel-muted)] px-2 py-1"
           >
             <Pause className="h-3.5 w-3.5" />
             {paused ? "Resume" : "Pause"}
@@ -120,7 +120,7 @@ export function AudioRecorder({ onUploaded }: AudioRecorderProps) {
           <button
             type="button"
             onClick={stop}
-            className="inline-flex items-center gap-1 rounded bg-zinc-900 px-2 py-1 text-white"
+            className="inline-flex items-center gap-1 rounded bg-[var(--accent)] px-2 py-1 text-white"
           >
             <Square className="h-3.5 w-3.5" />
             Stop

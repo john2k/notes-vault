@@ -84,7 +84,7 @@ export function SmartFolders({ onApply }: SmartFoldersProps) {
         />
         <button
           type="button"
-          className="rounded bg-stone-800 px-2 text-[11px] text-white"
+          className="rounded bg-[var(--accent)] px-2 text-[11px] text-white"
           onClick={() => void add()}
         >
           +

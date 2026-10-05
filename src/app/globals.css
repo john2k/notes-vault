@@ -3,32 +3,34 @@
 @tailwind utilities;
 
 :root {
-  --background: #ebe6dc;
-  --background-accent: #dfe8e4;
-  --foreground: #1c1917;
-  --panel: #fffdf8;
-  --panel-muted: #f3eee6;
-  --border: #d6cfc3;
-  --accent: #0f766e;
-  --accent-soft: #ccfbf1;
+  --background: #f3f3f3;
+  --background-accent: #e8e8e8;
+  --foreground: #1e1e1e;
+  --panel: #ffffff;
+  --panel-muted: #f3f3f3;
+  --border: #e5e5e5;
+  --accent: #0078d4;
+  --accent-soft: rgba(0, 120, 212, 0.12);
   --note-color: #71717a;
-  --note-wash: rgba(113, 113, 122, 0.08);
-  --code-bg: #1a2332;
-  --code-fg: #e8eef7;
+  --note-wash: rgba(0, 120, 212, 0.06);
+  --code-bg: #1e1e1e;
+  --code-fg: #d4d4d4;
+  --muted: #6b6b6b;
+  --selection: #add6ff;
 }
 
 .dark {
-  /* VS Code Dark+ inspired / inspiré Dark+ */
+  /* VS Code Dark+ */
   --background: #1e1e1e;
   --background-accent: #252526;
-  --foreground: #d4d4d4;
+  --foreground: #cccccc;
   --panel: #252526;
   --panel-muted: #2d2d2d;
   --border: #3c3c3c;
-  --accent: #3794ff;
-  --accent-soft: rgba(55, 148, 255, 0.12);
+  --accent: #0078d4;
+  --accent-soft: rgba(0, 120, 212, 0.18);
   --note-color: #858585;
-  --note-wash: rgba(55, 148, 255, 0.06);
+  --note-wash: rgba(0, 120, 212, 0.08);
   --code-bg: #1e1e1e;
   --code-fg: #d4d4d4;
   --selection: #264f78;
@@ -37,10 +39,7 @@
 
 body {
   color: var(--foreground);
-  background:
-    radial-gradient(1200px 600px at 0% -10%, var(--background-accent), transparent 55%),
-    radial-gradient(900px 500px at 100% 0%, #f0e6d8, transparent 50%),
-    var(--background);
+  background: var(--background);
   font-family: var(--font-sans), "IBM Plex Sans", sans-serif;
   min-height: 100vh;
 }

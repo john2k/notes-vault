@@ -40,16 +40,18 @@ export function Sidebar({
   }, [notes]);
 
   return (
-    <aside className="flex h-full min-h-0 flex-1 flex-col bg-[var(--panel-muted)]/90 backdrop-blur">
-      <div className="border-b border-stone-300/80 p-3">
-        <div className="font-[family-name:var(--font-display)] text-lg font-semibold tracking-tight text-stone-900">
+    <aside className="flex h-full min-h-0 flex-1 flex-col bg-[var(--panel)]">
+      <div className="border-b border-[var(--border)] p-3">
+        <div className="font-[family-name:var(--font-display)] text-lg font-semibold tracking-tight text-[var(--foreground)]">
           Notes Vault
         </div>
-        <p className="text-[11px] text-stone-500">File-over-app · local-first</p>
-        <div className="mt-3 flex items-center gap-2 rounded-lg border border-stone-300 bg-white px-2.5 py-2 shadow-sm">
-          <Search className="h-4 w-4 text-stone-400" />
+        <p className="text-[11px] text-[var(--muted,#858585)]">
+          File-over-app · local-first
+        </p>
+        <div className="mt-3 flex items-center gap-2 rounded-md border border-[var(--border)] bg-[var(--panel-muted)] px-2.5 py-2">
+          <Search className="h-4 w-4 text-[var(--muted,#858585)]" />
           <input
-            className="w-full bg-transparent text-sm outline-none placeholder:text-stone-400"
+            className="w-full bg-transparent text-sm text-[var(--foreground)] outline-none placeholder:text-[var(--muted,#858585)]"
             placeholder="Recherche / Search…"
             value={query}
             onChange={(e) => {
@@ -61,7 +63,7 @@ export function Sidebar({
         <button
           type="button"
           onClick={() => onCreate("_inbox")}
-          className="mt-2 inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-teal-800 px-2 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-teal-700"
+          className="mt-2 inline-flex w-full items-center justify-center gap-1.5 rounded-md bg-[var(--accent)] px-2 py-2 text-sm font-medium text-white transition hover:opacity-90"
         >
           <FilePlus2 className="h-4 w-4" />
           Nouvelle note
@@ -71,7 +73,7 @@ export function Sidebar({
       <div className="flex-1 overflow-auto p-2">
         {grouped.map(([folder, items]) => (
           <div key={folder} className="mb-3">
-            <div className="mb-1 flex items-center gap-1.5 px-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-stone-500">
+            <div className="mb-1 flex items-center gap-1.5 px-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--muted,#858585)]">
               <Folder className="h-3.5 w-3.5" />
               {folder}
             </div>
@@ -85,10 +87,10 @@ export function Sidebar({
                       type="button"
                       onClick={() => onSelect(note.path)}
                       className={cn(
-                        "flex w-full items-center gap-2 rounded-lg border-l-[3px] px-2 py-1.5 text-left text-sm transition",
+                        "flex w-full items-center gap-2 rounded-md border-l-[3px] px-2 py-1.5 text-left text-sm transition",
                         active
-                          ? "bg-stone-900 text-white shadow-sm"
-                          : "text-stone-800 hover:bg-white/80"
+                          ? "bg-[var(--accent-soft)] text-[var(--foreground)]"
+                          : "text-[var(--foreground)] hover:bg-[var(--panel-muted)]"
                       )}
                       style={{ borderLeftColor: color.solid }}
                     >
@@ -101,7 +103,9 @@ export function Sidebar({
                         <span
                           className={cn(
                             "ml-auto text-[9px] uppercase tracking-wide",
-                            active ? "text-amber-200" : "text-amber-700"
+                            active
+                              ? "text-[var(--accent)]"
+                              : "text-[var(--muted,#858585)]"
                           )}
                         >
                           pin
